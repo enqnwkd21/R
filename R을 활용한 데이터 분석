@@ -1,0 +1,288 @@
+# 데이터 분석 : 방대한 데이터에서 의미있는 정보를 추출, 가공
+# - 데이터 마이닝
+# - 기계학습(machine learning) : 데이터를 학습시켜 자동으로 의미있는 
+# 패턴이나 정보를 추출하게만든 학문/분석 기법
+# - 딥러닝(deep learning)
+
+# AI > 머신러닝 > 딥러닝
+
+# - 기계학습의 분류(학습 방식과 목적에 따른)
+# 1) 지도학습 : 정답(target, 종속변수, Y)이 존재,
+#               정답을 예측하는 것이 분석 목적
+#               여러 설명변수(X)들을 통해 Y를 예측(예측-Y가 연속형인 경우/분류-Y가 범주형인 경우)
+#  1-1) 회귀분석 : Y가 연속형
+#       (regression)
+
+#  1-2) 분류분석 : Y가 범주형
+#       (decision tree, random forest, logistic regression, svm, knn,
+#       naive byse, ann, ...)
+
+# 2) 비지도 학습 : 정답(target, 종속변수, Y)이 존재 X,
+#                  정답을 예측하는 것이 분석 목적이 아님
+#                  여러 변수들을 통해 의미있는 군집을 분류, 연관규칙발견
+#  2-1) 군집분석 : 전체 집합을 소집단으로 묶어 분류
+#  2-2) 연관분석 : 데이터들끼리 연관 규칙 발견(장바구니 분석)
+
+# 분류분석
+# 1. decision tree(의사결정나무)
+# - 트리기반 모델(패턴을 트리화 한 알고리즘)
+# - 하위 노드로 갈수록 분류 정확도가 높은(불순도가 낮은) 패턴을 학습
+# - 랜덤포레스트의 구성 요소
+# - 비통계적 모델이므로 통계적 해석 필요하지 않고 이해하기 쉬움
+# - 통계적으로 평가할 metric이 없음 => 몇 개 중 몇 개 예측 성공했느냐로 평가
+# - 시각화 가능 
+
+# 0. 필요 패키지 설치 및 로딩
+install.packages('rpart')
+library(rpart)
+
+# 1 . 모델링(모델 데이터 학습)
+rpart(formula = ,     # Y ~ X
+      data = )
+
+iris
+r1 <- rpart(formula = Species ~ . , data = iris)
+
+
+# ================================================================================
+# n = 150 # 150건의 학습된 데이터(input데이터의 개수)
+# 
+# node), split, n, loss, yval, (yprob)   # node : 분모/자식 노드, 가장 아래에 있는 노드는 terminal노드 
+# * denotes terminal node                # * 는 terminal node(종단노드)를 나타냄
+# 
+# 1) root 150 100 setosa (0.33333333 0.33333333 0.33333333)  # 가장 높은 node(root node) = setosa, (후속비율 0.33씩-다 섞여있음 )
+#   # 가장 상위 노드가 불순도가 제일 높다 => 불순도(부모노드 > 자식노드)
+#   2) Petal.Length< 2.45 50   0 setosa (1.00000000 0.00000000 0.00000000) *
+#   # Petal.Length< 2.45?라는 질문을 던지면 불순도가 낮아짐 => 이렇게 나누니 setosa가 딱 분리됨 => *로 terminal node(대표자)
+#   3) Petal.Length>=2.45 100  50 versicolor (0.00000000 0.50000000 0.50000000)  
+#   # 2번으로 나눠진 나머지는 아직 불순도가 높음 -> 50개가 오분류가 됨(50 versicolor) => 다시 분류해야함
+#     6) Petal.Width< 1.75 54   5 versicolor (0.00000000 0.90740741 0.09259259) *
+#     #  Petal.Width< 1.75에 54개 input but 49개는 알맞게 분류(0.90740741), 5개 오분류 (0.09259259) but 더 분류 안함=>*찍어버림 
+#     7) Petal.Width>=1.75 46   1 virginica (0.00000000 0.02173913 0.97826087) *
+#     # Petal.Width>=1.75 는 input이 46개(0.97826087)이고 1개만 오분류(0.02173913) => virginica를 종단노드로 확정 => 분류 끝!
+# ================================================================================     
+
+# 2. 모델 시각화
+# 1) 전체 데이터 분포 시각화
+plot(iris[,-5], col = iris$Species)       # iris$Species는 factor이기 때문에 색 구분 가능 (1,2,3..)
+  
+# 2) 단순 시각화
+plot(r1, compress = T, margin = .2)
+text(r1, cex = 1.5)
+
+# 3) 외부패키지 시각화
+install.packages('rpart.plot')
+library(rpart.plot)
+
+prp(r1,
+    type = 4,     # 그래프 출력 형태
+    extra = 2,    # 추가정보(2:정분류 개수/ 3: 오분류 개수 알려줌)
+    digits = 3)   # 출력 숫자 자리수
+
+r1
+
+# 3. 예측
+head(iris)
+new_data <- data.frame( Sepal.Length = 5.1,
+                        Sepal.Width = 3.7,
+                        Petal.Length = 1.5,
+                        Petal.Width = 0.7)
+
+predict(r1, newdata = new_data)                  # 예측형태 : 확률(default : prob)
+predict(r1, newdata = new_data, type = 'class')  # 예측형태 : 클래스이름
+
+
+# 4. 평가
+vpre <- predict(r1, newdata = iris[,-5], type = 'class')  # 예측결과 : X데이터만 넣기 (newdata = iris[,-5])
+iris$Species                                              # 실제결과
+
+sum(vpre == iris$Species) / nrow(iris) * 100
+
+
+# [ 실습 ]
+# 위 과정에 sampling 과정을 추가하여 test data set에 대한 평가점수 확인 ! 
+
+# 1. sampling (train/test 분리)
+vno <- sample(1:nrow(iris), size = nrow(iris) * 0.7)
+nrow(iris_train)
+iris_train <- iris[vno,]
+iris_test <- iris[-vno,]
+
+# 2. 데이터모델링 
+m2 <- rpart(Species ~ . ,data = iris_train)
+m2
+#===============================================================================
+# n= 105 
+# node), split, n, loss, yval, (yprob)
+# * denotes terminal node
+
+# 1) root 105 68 virginica (0.30476190 0.34285714 0.35238095)  
+# 2) Petal.Length< 2.45 32  0 setosa (1.00000000 0.00000000 0.00000000) *
+#   3) Petal.Length>=2.45 73 36 virginica (0.00000000 0.49315068 0.50684932)  
+# 6) Petal.Width< 1.75 38  3 versicolor (0.00000000 0.92105263 0.07894737) *
+#   7) Petal.Width>=1.75 35  1 virginica (0.00000000 0.02857143 0.97142857) *
+#===============================================================================
+  
+  
+# 3. 시각화
+prp(m2,
+    type = 4,     # 그래프 출력 형태
+    extra = 2,    # 추가정보(2:정분류 개수/ 3: 오분류 개수 알려줌)
+    digits = 3)
+
+
+# 4. 평가
+vpre <- predict(m2, newdata = iris_test[,-5], type = 'class')
+sum(vpre == iris_test$Species) / nrow(iris_test) * 100
+
+# 5. 튜닝
+# 1) minbucket = 20
+# 2) minbucket = round(minsplit/3) 
+# - 추가 가지치기를 진행할 최소 오분류 데이터의 수
+# - minbucket이 5이면, 오분류 데이터가 5이상일 경우 추가 가지치기를 진행
+# 3) cp = 0.01
+# 4) maxdepth = 30
+
+# [ 튜닝 진행 과정]
+# 1) 기본 모델
+m1 <- rpart(Species ~ ., data=iris)
+prp(m1,
+    type = 4,     
+    extra = 3,    
+    digits = 3)
+
+# 들여쓰기 위치가 같은 레벨상에 출력 (기준)
+# 1) root 150 100 setosa (0.33333333 0.33333333 0.33333333)  
+#   2) Petal.Length< 2.45 50   0 setosa (1.00000000 0.00000000 0.00000000) *
+#   3) Petal.Length>=2.45 100  50 versicolor (0.00000000 0.50000000 0.50000000)  
+#     6) Petal.Width< 1.75 54   5 versicolor (0.00000000 0.90740741 0.09259259) *
+#     7) Petal.Width>=1.75 46   1 virginica (0.00000000 0.02173913 0.97826087) *
+
+m2 <- rpart(Species ~ ., data=iris,
+            control = rpart.control(minbucket = 3))
+
+# 들여쓰기 위치가 같은 레벨상에 출력 (기준)
+# 1) root 150 100 setosa (0.33333333 0.33333333 0.33333333)  
+#   2) Petal.Length< 2.45 50   0 setosa (1.00000000 0.00000000 0.00000000) *
+#   3) Petal.Length>=2.45 100  50 versicolor (0.00000000 0.50000000 0.50000000)  
+#     6) Petal.Width< 1.75 54   5 versicolor (0.00000000 0.90740741 0.09259259)  
+#       12) Petal.Length< 4.95 48   1 versicolor (0.00000000 0.97916667 0.02083333) *
+#       13) Petal.Length>=4.95 6   2 virginica (0.00000000 0.33333333 0.66666667) *
+#     7) Petal.Width>=1.75 46   1 virginica (0.00000000 0.02173913 0.97826087) *
+
+# 시각화
+prp(m2,
+    type = 4,     
+    extra = 3,    
+    digits = 3)
+
+# 평가
+sum(predict(m2, newdata = iris[,-5], type = 'class') == iris$Species) / nrow(iris) * 100
+
+# 3) 매개변수 변화에 따른 예측률 비교
+# minbucket : 2~10
+# test score, train score, 시각화
+
+vno <- sample(1:nrow(iris), size = nrow(iris) * 0.7)
+nrow(iris_train)
+iris_tr <- iris[vno,]
+iris_te <- iris[-vno,]
+
+
+score_tr <- c() ; score_te <- c()
+for (i in 2:10){
+  m1 <- rpart(Species ~., data = iris_tr,
+              control = rpart.control(minbucket = i))
+  
+  vpre_tr <- predict(m1, iris_tr, type = 'class') 
+  vpre_te <- predict(m1, iris_te, type = 'class') 
+  
+  score_tr <- c(score_tr, sum(vpre_tr == iris_tr$Species) / nrow(iris_tr) * 100)
+  score_te <- c(score_te, sum(vpre_te == iris_te$Species) / nrow(iris_te) * 100)
+}
+
+# train data 가 test data 보다 높은게 좋은것임, 차이가 없는게 제일 좋음
+# test가 train보다 높은 구간은 그닥 좋은 것 X
+plot(2:10, score_tr, type = 'o', col ='red',ylim = c(85,100))
+lines(2:10, score_te, type = 'o', col ='blue',ylim = c(85,100))
+legend('left', legend = c('train','test'), col = c('red','blue'), lty = 1)
+
+
+# 결론
+# 정확도가 높으면서 train, test의 평가점수의 gap이 크지 않는 매개변수 선택
+# 과대적합, 과소적합이 발생하지 않는 매개변수를 선택
+
+# [ 연습 문제 ]
+cancer <- read.csv('cancer.csv')
+head(cancer)
+
+cancer <- cancer[,-1]     # id컬럼은 암의 양성 여부에 영향X
+
+# 데이터 분포 시각화
+col = cancer$diagnosis # 불가 -> factor형식으로 바꿔줘야 컬러로 인식할 수 있음 
+cancer$diagnosis <- factor(cancer$diagnosis)
+plot(cancer[,2:10], col = cancer$diagnosis)
+
+
+# 1. sampling
+rn <- sample(1:nrow(cancer), size = nrow(cancer) * 0.7)
+nrow(cancer_te)
+cancer_tr <- cancer[rn,]
+cancer_te <- cancer[-rn,]
+
+# 2. modeling
+m1 <- rpart(diagnosis ~., data = cancer_tr)
+
+# 3. score
+vpre <- predict(m1, cancer_te, type = 'class') 
+sum(vpre == cancer_te$diagnosis)/ nrow(cancer_te) * 100
+
+# 4. tunnig
+# 각각 점수를 구해야 하는 이유 not only test data =  과대 과소 적합 여부 확인을 위해서
+vscore_tr <- c() ; vscore_te <- c()
+for (i in 2:10){
+  m1 <- rpart(diagnosis ~., data = cancer_tr,
+              control = rpart.control(minbucket = i))
+  
+  vpre_tr <- predict(m1, cancer_tr, type = 'class') 
+  vpre_te <- predict(m1, cancer_te, type = 'class') 
+  
+  score_tr <- sum(vpre_tr == cancer_tr$diagnosis) / nrow(cancer_tr) * 100
+  score_te <- sum(vpre_te == cancer_te$diagnosis) / nrow(cancer_te) * 100
+  
+  vscore_tr <- c(vscore_tr, score_tr)
+  vscore_te <- c(vscore_te, score_te)
+}
+
+
+plot(2:10, vscore_tr, type = 'o', col ='red',ylim = c(85,100))
+lines(2:10, vscore_te, type = 'o', col ='blue',ylim = c(85,100))
+legend('topright', legend = c('train','test'), col = c('red','blue'), lty = 1)
+
+# 과대적합(train&test 차이가 10% 이상나는 것)과 과소적합(잘못된 현상)
+# 과적합 : 모델의 복잡성이 높을수록 훈련 데이터에 대해서는 오류가 적어짐
+#          실제 데이터에 대해서 일정 수준 이상의 복잡성은 오류를 증가시킴
+#          정확한 모델을 생성하기 위해서는 복잡성을 적절한 수준으로 유지할 필요가 있음
+
+# - 과대적합 : 훈련셋만 예측이 강하고 새로운 데이터셋(평가셋)에는 예측이 떨어지는 현상
+#              모델이 너무 복잡해지면서
+#              훈련셋을 기준으로 한 패턴이 형성되면
+#              그것과 다른 성격을 지는 새로운 데이터 셋에는 적용하기 어려운 
+#              훈련셋만을 분류하는 기준이 만들어 지게 되는데 
+#              이 경우 모델의 본 목적은 새로운 데이터의 예측이므로
+#              과대적합의 경우는 모델을 일반화(새로운 데이터에도 적용 가능한)시키기 어려우므로
+#              최종 모델로 고려될 수 없다.
+# 
+# - 과소적합 : 일반적으로 평가셋 점수보다 훈련셋 점수가 높을 수 밖에 없는데
+#              오히려 평가셋 점수가 훈련셋 점수보다 높게 나오는 현상을 말함
+#              주로 모델이 너무 단순하여 만들어진 모델로도 훈련셋에 대한 예측이 떨어지는데
+#              우연으로 오히려 새로운 데이터셋(평가셋)에 대해 점수가 높아지는 현상이 발견 됨
+
+# => dt1에서 2~5까지는 과대적합이고 8~10까지는 과소적합임
+
+
+# train데이터는 이미 학습시킨 데이터여서 predict를 했을 때 예측력이 test보다 높게 나오는게 정상
+# 훈련된 데이터로 다시 학습을 하게 되면 정답을 맞출 확률이 높음. 데이터를 기억하고 있기 때문에
+# but train 데이터를 쓸 수는 없음. 모든 데이터를 일반화해야하기 때문에 
+# 훈련된 데이터를 쓰면 일반화가 잘못됨 (새로운 데이터에 대한 일반화 X)
+# train test데이터의 gap이 너무 커도 일반화X
