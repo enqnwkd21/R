@@ -1,0 +1,76 @@
+# 변수 선택(feature selection)
+# - 모델링전에 모델에 학습할 변수를 선택 혹은 제거하는 작업
+# - 도메인 지식에 근거한 선택(전문가의 견해, 경험적 지식)  *****
+# - 다양한 변수 선택 기법들이 존재(모델 내부에서 제공, 통계적 분석 결과를 제공)
+
+# 1. 모델에 의한 선택
+# - tree 기반 모델들의 특성 중요도
+# - 회귀 분석의 회귀 계수의 비교(스케일링 필요)
+
+# 2. 통계적 기법
+# 1) 전진선택법(forward selection)
+# - 아무 변수를 추가하지 않은 상태에서 가장 중요도가 높은 변수 순으로 순차적으로 추가
+# - 변수를 추가하기 이전보다 설명력이 좋아지면 변수가 추가
+# - 변수를 추가했을때 오히려 설명력이 떨어지면 변수를 추가하지 않고 stop
+ 
+# 2) 후진제거법(backward selection)
+# - 전체변수가 삽입되어 있는 상태에서 가장 변수 중요도가 낮은 순으로 순차적으로 제거
+# - 변수를 제거하기 이전보다 설명력이 좋아지면 변수는 제거
+# - 변수를 제거했을때 오히려 설명력이 떨어지면 변수는 제거되지 않고 stop
+
+# 3) 단계적선택법(stepwise selection)
+# - 전체변수가 삽입되어 있는 상태에서 가장 변수 중요도가 낮은 순으로 순차적으로 제거
+# - 변수를 제거하기 이전보다 설명력이 좋아지면 변수는 제거
+# - 이미 제거된 변수라도 다시 추가했을 경우 설명력이 좋아지면 변수는 다시 추가
+
+
+# [ 예제 - 보스턴 주택 가격셋을 사용한 변수 선택 방법 ]
+install.packages('mlbench')
+library(mlbench)
+
+data("BostonHousing")
+str(BostonHousing)
+  
+# 1. 모델에 의한 선택
+# 1) 회귀 분석
+m_lm <- lm(medv ~ . , data = BostonHousing)
+
+# 2. 통계적 기법에 의한 변수 선택
+# 1) 회귀분석에서의 변수 선택
+# 1-1) step
+step(m_lm, direction = 'forward')
+step(m_lm, direction = 'backward')
+step(m_lm, direction = 'both')
+
+# 1-2) regsubsets : 최종 선택 특성의 수에 따른 최적의 조합 확인
+install.packages('leaps')
+library(leaps)  
+
+m_reg1 <- regsubsets(medv ~ ., data = BostonHousing)
+summary(m_reg1)
+
+dev.new()
+plot(m_reg1, scale='adjr2')
+
+
+# 2) 분류분석에서의 변수 선택
+# step1. modeling
+library(rpart)
+dt1 <- rpart(Species ~ ., iris)  
+dt1$variable.importance
+
+# step2. feature selection
+install.packages('MASS')
+library(MASS)  
+
+install.packages('klaR')
+library(klaR)
+
+stepclass(x,                     # x data
+          y,                     # y data
+          method = 'lda',        # 분류방법
+          direction = '',        # forward, backward, both
+          start.vars = )         # 시작변수
+
+
+stepclass(iris[,-5], iris$Species, 'lda', direction = 'both', improvement = 0.001)
