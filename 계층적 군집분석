@@ -1,0 +1,305 @@
+# 분류분석 기법
+# - Y가 존재 / Y를 분류하는 기준을 찾는게 목적
+# - 비통계적 모델이 다수
+
+# 1. tree 기반 모델
+# - DT -> RF -> GBT -> EGB
+# - 변수선택 기능(변수중요도 측정 <- 불순도로 측정(gini index, 엔트로피지수))
+# - 별도의 튜닝 없이 예측력 좋다
+# - 쉽다
+# - 통계적 가정 불필요
+# - 이상치 덜 민감
+# - 이산형 변수/ 연속형 변수 모두 유리
+ 
+# 2. 거리 기반 모델
+# - knn / 군집분석(k-means)
+# - 거리를 기반으로 유사성과 이질성을 판단
+# - 이산형 변수 / 명목형 변수가 많을수록 불리
+# - 변수 스케일링 필요(정확한 거리를 반영)
+# - 고차원 데이터에 불리 
+# - 이상치 민감(사전에 이상치 처리 필수)
+# - 선택된 변수에 민감(사전에 반드시 변수선택 처리)
+
+
+# 변수 스케일링 : 변수의 범위를 비슷하게 조절
+# 1. standard scaling(표준화) : 평균을 0, 표준편차를 1로 만드는 작업
+#    (x - mean) / std
+
+f1 <- function(x) {
+  (x - mean(x)) / sd(x)
+}
+
+apply(iris[,-5], 2, f1)   # -0.89767388  1.01560199  -1.33575163 -1.3110521482
+scale(iris[,-5])          # -0.89767388  1.01560199  -1.33575163 -1.3110521482
+
+
+# 2. minmax scaling : 최솟값을 0, 최댓값을 1로 맞추는 작업
+#    (x - min) / (max - min)
+
+# 10,   15,    20,   30    # raw data
+# 0   0.25     0.5    1    # minmax scaling data
+
+library(caret)
+m_sc <- preProcess(iris[,-5], method='range')
+iris_x_sc <- predict(m_sc, iris[,-5])
+apply(iris_x_sc, 2, min)
+apply(iris_x_sc, 2, max)
+
+
+# 문제1. knn 분류방법에 대한 설명으로 맞지 않는 것은?
+# 1. 간단하고 효과적으로 입력값을 분류할 수 있다. 
+# 2. 기본적인 분포 가정이 없다. 
+# 3. 학습과정이 빠르다.
+# 4. 적절한 K선택은 자동으로 이루어진다.  
+
+# 문제2. 의사결정에 대한 설명으로 맞지 않는 것은?
+# 1. 분류결과가 트리구조라 쉽게 이해가 가능하다. 
+# 2. 훈련 데이터 개수, 노드 선정에 따라 의사결정나무 모델이 고정되어 있다.
+# 3. 수치자료와 범주자료에 모두 적용 가능하다. 
+# 4. 일부 명제가 손상되어도 안정적으로 동작한다. 
+
+# 문제3. 빅데이터 처리 과정으로 맞는 것은? 
+# 1. 추출 - 저장 - 분석 - 시각화 - 예측 - 적용
+# 2. 추출 - 분석 - 시각화 - 저장 - 예측 - 적용
+# 3. 추출 - 시각화 - 분석 - 저장 - 예측 - 적용
+# 4. 추출 - 분석 - 저장 - 시각화 - 예측 - 적용
+
+
+# [ iris data - knn ]
+# 1. scaling
+iris_sc <- scale(iris[,-5])
+
+# 2. data split
+rn <- sample(1:150, 150*0.7)
+
+iris_tr <- iris[rn,]
+iris_te <- iris[-rn,]
+
+iris_sc_tr_x <- iris_sc[rn,]
+iris_tr_y <- iris$Species[rn]
+
+iris_sc_te_x <- iris_sc[-rn,]
+iris_te_y <- iris$Species[-rn]
+
+# 3. modeling
+# 1) raw data
+m_knn <- knn(iris_tr[,-5], iris_te[,-5], iris_tr$Species, k = 3)
+sum(m_knn == iris_te$Species) / nrow(iris_te)   # 97.78
+
+# 2) scaling data
+library(class)
+m_sc <- knn(iris_sc_tr_x, iris_sc_te_x, iris_tr_y, k = 3)
+sum(m_sc == iris_te_y) / nrow(iris_sc_te_x)      # 93.33
+
+# 3) scaling data + feature selection
+m_sc_fs <- knn(iris_sc_tr_x[,3:4], iris_sc_te_x[,3:4], iris_tr_y, k = 3)
+sum(m_sc_fs == iris_te_y) / nrow(iris_sc_te_x)   # 1
+
+
+# 군집분석(clustering)
+# target이 없는 비지도 학습
+# 데이터를 유사성/이질성 기반으로 세분화(분리)
+# 나뉜 데이터를 보고 추가 데이터의 특성을 파악하는 용도로 주로 사용
+# 분류된 데이터의 특성을 파악한 수 지도학습으로 추가 연구 가능
+
+# 1. 계층적 군집분석
+# - 거리가 짧은 데이터포인트끼리 군집을 순차적으로 형성하는 과정
+# - 군집에 한 번 포함된 데이터포인트는 군집을 바꿀수 없다(군집 이동 불가)
+# - 반드시 하나의 데이터포인트는 하나의 군집에 포함(여러 군집에 포함될 수 없음)
+# - 군집과 데이터포인트의 거리를 측정하는 방식에 따라 다양한 모델 제공
+# - 군집의 수가 정해져 있지 않고 군집수행 결과를 보고 사용자가 판단
+
+# 군집과 데이터포인트와(군집에 속하지 않은)의 거리 계산 방법
+# 1. 최단거리법 : 군집에 속한 데이터와의 거리를 모두 계산한 후 그 중 최소거리
+# 2. 최장거리법 : 군집에 속한 데이터와의 거리를 모두 계산한 후 그 중 최대거리
+# 3. 평균거리법 : 군집에 속한 데이터들의 거리의 평균
+# 4. 중앙거리법(중심법) : 군집에 속한 데이터들의 중심과의 거리
+# 5. 와드연결법 : 새로운 군집으로 인해 파생되는 오차제곱합의 증가량으로 거리 측정
+
+
+# 군집분석 수행 과정
+library(stringr)
+v1 <- c(1,3,6,10,18)
+names(v1) <- str_c('p',1:5)
+
+dist(v1)
+   p1 p2 p3 p4
+p2  2         
+p3  5  3      
+p4  9  7  4   
+p5 17 15 12  8
+
+# step1) 개별 데이터포인트들끼리 모든 거리를 계산한 후 가장 가까운 두 포인트를 하나의 클러스터로 묶음
+# => C1(p1,p2) 형성
+
+# step2) 형성된 클러스터와 나머지 데이터포인트끼리의 거리 계산
+d(c1,p3) = min(d(p1,p3), d(p2,p3)) = min(5,3) = 3
+d(c1,p4) = min(d(p1,p4), d(p2,p4)) = min(9,7) = 7
+d(c1,p5) = min(d(p1,p5), d(p2,p5)) = min(17,15) = 15
+
+# step3) 위 거리중 가장 짧은 거리 확인(새로운 클러스터가 형성되거나 기존 클러스터에 소속)
+# => C1에 p3를 포함 => C1(p1,p2,p3)
+#     p3  p4  p5
+# c1  3   7   15
+# p3  .        
+# p4  4   .  
+# p5  12  8   .
+
+# step4) 새로운 클러스터 혹은 확장된 클러스터와의 거리 계산 후
+# 새로운 클러스터가 형성되거나 기존 클러스터에 소속
+d(c1,p4) = min(d(p1,p4), d(p2,p4), d(p3,p4)) = min(9,7,4) = 4
+d(c1,p5) = min(d(p1,p5), d(p2,p5), d(p3,p5)) = min(17,15,12) = 12
+# => C1에 p4에 포함 => C1(p1,p2,p3,p4)
+#     p4  p5
+# c1  4   12
+# p4  .     
+# p5  8  .
+
+# 최종결론 : 계층적군집분석으로 최단거리법으로 수행한 결과 C1(p1,p2,p3,p4), C2(p5)
+
+
+# [ 위 데이터의 군집 형성 과정 시각화 ]
+# 1. 거리 행렬 구하기
+d1 <- dist(v1)    
+
+# 2. 군집 분석 수행
+m_clust1 <- hclust(d1,   # 거리행렬
+                   method = 'single')
+
+# method
+# 1) 와드연결법 : "ward.D", "ward.D2"
+#    (use squared Euclidean distances with Ward1 and nonsquared Euclidean distances with Ward2)
+# 2) 최단연결법 : "single"
+# 3) 최장연결법 : "complete" (default)
+# 4) 평균연결법 : "average", "median" 
+# 5) 중심연결법 : "centroid" 
+
+# 3. 시각화
+dev.new()
+plot(m_clust1,
+     hang = -1,     # 포인트 배치를 x축에 고정
+     cex = 0.8)
+
+rect.hclust(m_clust1,   # 모델 이름
+            k = 3)      # 사용자가 정의한 군집 수
+
+# [ 연습 문제 - iris data를 사용한 clustering ]
+
+# 1. raw data
+d1 <- dist(iris[,-5])
+m1_s <- hclust(d1, method = 'single')
+m1_c <- hclust(d1, method = 'complete')
+m1_a <- hclust(d1, method = 'average')
+m1_w <- hclust(d1, method = 'ward.D')
+m1_d <- hclust(d1, method = 'centroid')
+
+dev.new()
+par(mfrow=c(1,5))
+
+plot(m1_s, hang = -1, cex = 0.6, main = 'single')
+rect.hclust(m1_s, k = 3)
+
+plot(m1_c, hang = -1, cex = 0.6, main = 'complete')
+rect.hclust(m1_c, k = 3)
+
+plot(m1_a, hang = -1, cex = 0.6, main = 'average')
+rect.hclust(m1_a, k = 3)
+
+plot(m1_w, hang = -1, cex = 0.6, main = 'ward.D')
+rect.hclust(m1_w, k = 3)
+
+plot(m1_d, hang = -1, cex = 0.6, main = 'centroid')
+rect.hclust(m1_d, k = 3)
+
+# 2. scaling
+iris_sc <- scale(iris[,-5])
+d1 <- dist(iris_sc)
+m1_s <- hclust(d1, method = 'single')
+m1_c <- hclust(d1, method = 'complete')
+m1_a <- hclust(d1, method = 'average')
+m1_w <- hclust(d1, method = 'ward.D')
+m1_d <- hclust(d1, method = 'centroid')
+
+dev.new()
+par(mfrow=c(1,5))
+
+plot(m1_s, hang = -1, cex = 0.6, main = 'single')
+rect.hclust(m1_s, k = 3)
+
+plot(m1_c, hang = -1, cex = 0.6, main = 'complete')
+rect.hclust(m1_c, k = 3)
+
+plot(m1_a, hang = -1, cex = 0.6, main = 'average')
+rect.hclust(m1_a, k = 3)
+
+plot(m1_w, hang = -1, cex = 0.6, main = 'ward.D')
+rect.hclust(m1_w, k = 3)
+
+plot(m1_d, hang = -1, cex = 0.6, main = 'centroid')
+rect.hclust(m1_d, k = 3)
+
+# 3. scaling + feature selection
+iris_sc <- scale(iris[,3:4])
+d1 <- dist(iris_sc)
+m1_s <- hclust(d1, method = 'single')
+m1_c <- hclust(d1, method = 'complete')
+m1_a <- hclust(d1, method = 'average')
+m1_w <- hclust(d1, method = 'ward.D')
+m1_d <- hclust(d1, method = 'centroid')
+
+dev.new()
+par(mfrow=c(1,5))
+
+plot(m1_s, hang = -1, cex = 0.6, main = 'single')
+rect.hclust(m1_s, k = 3)
+
+plot(m1_c, hang = -1, cex = 0.6, main = 'complete')
+rect.hclust(m1_c, k = 3)
+
+plot(m1_a, hang = -1, cex = 0.6, main = 'average')
+rect.hclust(m1_a, k = 3)
+
+plot(m1_w, hang = -1, cex = 0.6, main = 'ward.D')
+rect.hclust(m1_w, k = 3)
+
+plot(m1_d, hang = -1, cex = 0.6, main = 'centroid')
+rect.hclust(m1_d, k = 3)
+
+# 군집 결과 확인하기
+cutree(m1_w, k = 3)
+
+iris_bak <- iris
+iris_bak$cnum <- cutree(m1_w, k = 3)
+
+# [ 참고 : 평가 점수 확인(원래 군집분석은 오분류율을 알 수 없다) ]
+rnum <- ifelse(iris_bak$Species=='setosa', 1, ifelse(iris_bak$Species=='versicolor',2,3))
+
+sum(rnum == iris_bak$cnum) / 150 * 100
+
+# [ 참고 : 적절한 군집의 수 확인(군집수가 미정일 경우 군집수를 내부적으로 평가하여 추천) ]
+install.packages('NbClust')
+library(NbClust)
+
+dev.new()
+nbcl <- NbClust(data = iris_sc,            # 군집분석 수행 할 데이터(거리행렬X)
+                min.nc = 2,                # 최소 군집 수
+                max.nc = 10,               # 최대 군집 수
+                method = 'ward.D')
+# 
+# ******************************************************************* 
+# * Among all indices:                                                
+# * 8 proposed 2 as the best number of clusters      # 총 26개 지표 중 8개 지표가 2개의 군집수가 가장 좋다라고 생각
+# * 10 proposed 3 as the best number of clusters     # 총 26개 지표 중 10개 지표가 3개의 군집수가 가장 좋다라고 생각
+# * 1 proposed 4 as the best number of clusters 
+# * 1 proposed 6 as the best number of clusters 
+# * 1 proposed 7 as the best number of clusters 
+# * 2 proposed 9 as the best number of clusters 
+# * 1 proposed 10 as the best number of clusters 
+                
+
+
+
+
+
+
+
