@@ -1,0 +1,270 @@
+# Random Forest
+# 앙상블 모델(여러 모델이 혼합되어 하나의 결론을 내는 알고리즘 형태)
+# 단일 의사결정나무가 혼합되어 있는 형태
+# 최종 결론은 각 의사결정나무의 결론을 종합(투표, 평균)
+# 일반적으로 분류분석(최종결론:투표)을 위해 사용, 회귀분석(최종결론:평균)을 위해 사용
+
+# Random Forest를 사용한 iris data의 모델링 과정
+install.packages('randomForest')
+library(randomForest)
+
+# 1. sampling
+rn <- sample(1:nrow(iris), size = nrow(iris) * 0.7)
+iris_tr <- iris[rn,]
+iris_te <- iris[-rn,]
+
+# 2. modeling
+library(rpart)
+
+m1 <- randomForest(Species ~ . , data = iris_tr)
+m2 <- rpart(Species ~ . , data = iris_tr)
+
+m1
+# -----------------------------------------------------
+# Call:
+#   randomForest(formula = Species ~ ., data = iris_tr) 
+# Type of random forest: classification
+# Number of trees: 500
+# No. of variables tried at each split: 2
+# 
+# OOB estimate of  error rate: 6.67%   => 7/105
+# Confusion matrix:
+#               setosa versicolor virginica class.error
+# setosa         36          0         0     0.0000000
+# versicolor      0         29         3     0.0937500
+# virginica       0          4        33     0.1081081
+# -----------------------------------------------------
+
+# 3. score
+vpre_dt <- predict(m2, newdata = iris_te, type = 'class')
+vpre_rf <- predict(m1, newdata = iris_te, type = 'class')
+
+sum(vpre_rf == iris_te$Species) / nrow(iris_te)   # 95.56
+sum(vpre_dt == iris_te$Species) / nrow(iris_te)   # 93.33
+
+help("randomForest")
+
+# 4. 모델 속성
+m1$importance
+
+sample(1:5, size = 5, replace = T)
+5 1 1 2 2
+1 3 1 3 4
+3 5 5 4 2
+
+# 매개변수
+# ntree=500
+# mtry
+
+
+# Random Forest 알고리즘
+# 1. 임의화(Randomization)
+#    복원추출을 허용한 랜덤샘플링(각 트리마다 학습되는 데이터의 수 같다)
+#      => 서로 다른 데이터로 각 트리를 훈련시킴 => 각 트리가 서로 달라짐
+
+# 2. bootstrap : 주어진 훈련 데이터에서 중복을 허용하여 원래 데이터와 같은 크기를
+#                갖는 데이터를 만드는 과정
+
+# 3. bagging : bootstrap + aggregating
+#              각각 중복을 허용한 서로 다른 데이터를 각 트리에 학습시켜
+#              결합하여 최종 결론을 내는 방식
+
+# 4. mtry 매개변수 도입(가지치기 할때마다 고려되는 설명변수의 개수)
+#    bootstrap 과정(훈련 데이터셋을 동일한 크기로 복원추출을 허용하여 서로 다른 데이터셋으로 구성)에서
+#    혹시나 같은 데이터가 구성될 수 있으며 이 때 각 트리는 비슷하게 형성될 가능성이 있음
+#    따라서 각 트리를 구성할 때 가지치기(split)를 할 때마다 모든 설명변수를 고려하게 되면
+#    각 설명변수의 중요도 순서가 동일하거나 비슷하여 비슷한 트리가 구성될 확률이 높다.
+#    따라서 가지치기를 할 때마다 모든 설명변수를 고려하는게 아닌, 그 중 일부(mtry로 개수 정함)를 랜덤하게 선택하여
+#    선택된 변수중 우선순위가 높은 변수를 사용한다면
+#    더욱더 트리는 다르게 구성될 수 있다!
+
+# mtry가 작을수록 서로 다른 트리가 구성될 확률이 높다, 각 트리가 복잡해질 가능성 있음
+# mtry가 클수록 서로 같은 트리가 구성될 확률이 높다, 각 트리가 단순해질 가능성 있음
+
+
+# [ RF in cancer data ]
+# 종속변수 factor로 바꿔주세요 
+# => R의 RF 함수가  종속변수의 팩터여부에 따라 회귀분석과 분류분석으로 구분
+
+# 1. data loading
+cancer <- read.csv('cancer.csv', stringsAsFactors = T)
+cancer <- cancer[,-1]
+
+# 2. split
+rn <- sample(1:nrow(cancer), nrow(cancer) * 0.7)
+cancer_tr <- cancer[rn, ]
+cancer_te <- cancer[-rn, ]
+
+# 3. modeling
+m_dt <- rpart(diagnosis ~ ., data = cancer_tr)
+m_rf <- randomForest(diagnosis ~ ., data = cancer_tr)
+
+# 4. score
+pre_dt <- predict(m_dt, newdata = cancer_te, type = 'class')
+pre_rf <- predict(m_rf, newdata = cancer_te, type = 'class')
+
+sum(pre_dt == cancer_te$diagnosis) / nrow(cancer_te)    # 93.56
+sum(pre_rf == cancer_te$diagnosis) / nrow(cancer_te)    # 94.73
+
+# 5. tunning
+# 1) 트리의 수(elbow point)
+vscore_tr <- c() ; vscore_te <- c()
+
+for (i in 1:500) {
+  m_rf <- randomForest(diagnosis ~ ., data = cancer_tr, ntree = i)
+  
+  pre_tr <- predict(m_rf, newdata = cancer_tr, type = 'class')
+  pre_te <- predict(m_rf, newdata = cancer_te, type = 'class')
+  
+  score_tr <- sum(pre_tr == cancer_tr$diagnosis) / nrow(cancer_tr) * 100
+  score_te <- sum(pre_te == cancer_te$diagnosis) / nrow(cancer_te) * 100
+  
+  vscore_tr <- c(vscore_tr, score_tr)
+  vscore_te <- c(vscore_te, score_te)
+}
+
+dev.new()
+plot(1:500, vscore_tr, type = 'o', col = 'red', ylim = c(90, 100))
+lines(1:500, vscore_te, type = 'o', col = 'blue')
+
+# 2) mtry 수
+vscore_tr <- c() ; vscore_te <- c()
+
+for (i in 1:ncol(cancer[,-1])) {
+  m_rf <- randomForest(diagnosis ~ ., data = cancer_tr, 
+                       ntree = 50, mtry = i)
+  
+  pre_tr <- predict(m_rf, newdata = cancer_tr, type = 'class')
+  pre_te <- predict(m_rf, newdata = cancer_te, type = 'class')
+  
+  score_tr <- sum(pre_tr == cancer_tr$diagnosis) / nrow(cancer_tr) * 100
+  score_te <- sum(pre_te == cancer_te$diagnosis) / nrow(cancer_te) * 100
+  
+  vscore_tr <- c(vscore_tr, score_tr)
+  vscore_te <- c(vscore_te, score_te)
+}
+
+dev.new()
+plot(vscore_tr, type = 'o', col = 'red', ylim = c(90, 100))
+lines(vscore_te, type = 'o', col = 'blue')
+
+
+# tree 기반 모델 특징
+# 비통계적 모델 => 해석이 쉽다, 통계적 가정이 불필요, 통계적 유의성 평가 불가
+# 인과관계 도출 불가
+# 대체적으로 분류분석을 위한 모델이나 회귀 가능
+# 이상치에 덜 민감
+# 모델링 전변수 선택 과정에 대한 부담 적다(내부적으로 변수 평가)
+# 변수 스케일링 불필요
+# 별도의 튜닝 없이도 높은 예측력
+# 설명변수가 이산형, 연속형일 경우 모두 효과적
+
+
+
+# 거리기반 모델 : knn 모델, 군집분석 모델(계층형, 비계층형(k-means))
+
+# 유클리안 거리
+d12 = sqrt((x11-x12)^2 + (x21-x22)^2 + (x31-x32)^2 + ... + (xn1-xn2)^2)
+
+# 거리를 구할 때 각 변수가 스케일이 조정되야 하는 이유(스케일링, 변수 표준화)
+
+# [ 기존 data ]
+# no  소득  직업        지출    상품구매여부(target)
+# 1   400   회사원(1)   200      X
+# 2   410   회사원(1)   220      X
+# 3   500   자영업(9)   400      O
+ 
+# 4   420   회사원(1)   180      ?
+
+# d41 = sqrt((400-420)^2 + (1-1)^2 + (200-180)^2) = 28.28
+# d42 = sqrt((420-410)^2 + (1-1)^2 + (180-220)^2) = 41.23
+# d43 = sqrt((420-500)^2 + (1-9)^2 + (180-400)^2) = 234.23
+
+# => 1번과 가장 가까우므로 1번의 구매성향과 비슷하다는 가정하에 상품 구매 X 예상!
+
+
+# knn 모델링 in iris data
+# 1. samplig
+rn <- sample(1:nrow(iris), nrow(iris)*0.7)
+
+iris_tr <- iris[rn, ]
+iris_te <- iris[-rn, ]
+
+# 2. modeling 
+install.packages('class')
+library(class)
+
+knn(train = ,    # train data(X)
+    test = ,     # test data(X)
+    cl =   ,     # train data(Y)
+    k = ,        # 이웃의 수
+    prob = )     # 확률 출력 여부
+
+
+m1 <- knn(iris_tr[,-5], iris_te[,-5], iris_tr$Species, k = 3)   # 예측과정이 포함되어 있음
+
+# test data의 첫번째 데이터포인트와 train data의 모든 관측치와의 거리를 계산
+# 가장 가까운 train data의 3(k=3)개 포인트 확인
+# 다수결에 의해 최종 결론
+
+# 3. 평가
+sum(m1 == iris_te$Species) / nrow(iris_te)   # 97.77
+
+# 4. k값 튜닝
+vscore_tr <- c() ; vscore_te <- c()
+
+for (i in 1:10) {
+  pre_tr <- knn(iris_tr[,-5], iris_tr[,-5], iris_tr$Species, k = i)
+  pre_te <- knn(iris_tr[,-5], iris_te[,-5], iris_tr$Species, k = i)
+  
+  score_tr <- sum(pre_tr == iris_tr$Species) / nrow(iris_tr) * 100
+  score_te <- sum(pre_te == iris_te$Species) / nrow(iris_te) * 100
+  
+  vscore_tr <- c(vscore_tr, score_tr)
+  vscore_te <- c(vscore_te, score_te)
+}
+
+dev.new()
+plot(vscore_tr, type = 'o', col = 'red', ylim = c(90,100))
+lines(vscore_te, type = 'o', col = 'blue')
+
+
+# [ 거리 계산 시 표준화 필요 이유 ]
+
+# no 	x1 	x2
+# 1	  5	  100
+# 2	  6	  200
+# 3	  10	150
+
+# 1) 표준화 없이 일반 거리 계산
+# d12 <- sqrt((5-6)^2 + (100-200)^2)    # 100.005
+# d13 <- sqrt((5-10)^2 + (100-150)^2)   # 50.24938  
+
+# d12 > d13
+ 
+# 2) 표준화 후 표준 거리 계산
+# x1의 평균 : 6, 표준편차 : 0.01
+# x2의 평균 : 150, 표준편차 : 30
+# 표준화 =  (x - 평균) / 표준편차
+
+# no      	x1 	          x2
+# 1	 (5-6)/0.01   (100-150)/30
+# 2	 (6-6)/0.01   (200-150)/30
+# 3	 (10-6)/0.01  (150-150)/30
+
+# no   	x1 	   x2
+# 1	  -100   -1.67
+# 2	    0     1.67
+# 3	   400     0
+ 
+# d12 <- sqrt(100^2 + (-1.67-1.67)^2)    # 100.0558
+# d13 <- sqrt((-100-400)^2 + (-1.67)^2)  # 500.0028
+
+# d12 < d13
+
+
+
+
+
+
+
