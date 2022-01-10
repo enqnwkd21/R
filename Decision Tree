@@ -1,0 +1,122 @@
+
+# Desicion Tree
+library(rpart)
+m1 <- rpart(Species ~ ., data = iris)
+
+# Desicion Tree의 매개변수
+# 1) minbucket = minsplit : 추가 가지치기를 진행할 최소 오분류 개수
+#                           (minbucket이 7일 경우 특정노드의 오분류 개수가 10이면 추가 가지치기 진행)
+#    minbucket이 작을수록 트리는 복잡해지며, 예측력은 높아질수 있으나 과대적합 문제 발생 가능성 높아짐
+#    minbucket을 줄인다고 항상 추가 가지치기가 진행되는건 아니다!(더이상 추가 분리 기준이 없을 수 있음)
+    
+# 2) maxdepth : tree의 깊이(크기)를 조절하는 매개변수
+#    maxdepth가 작을수록 단순한 트리가 형성
+#    maxdepth는 클수록 대체적으로 복잡한 트리가 형성되지만 늘 복잡해지지는 X
+
+# 3) cp : tree의 깊이(크기)를 조절하는 매개변수
+# cptable로 측정된 각 트리의 depth와 cp값의 관계를 파악한 수 depth 조절
+
+
+# [ 실습 : 매개변수 변화에 따른 모델 변화 확인 ]
+m1 <- rpart(Species ~ . , data = iris)
+m2 <- rpart(Species ~ . , data = iris, control = rpart.control(maxdepth = 1))
+
+# cptable : nsplit(가지치기 횟수)의 정도를 cp값으로 표현하여 출력(complexity parameter)
+# => 몇번 가지치기 할 지를 cp값을 보고 조절 할 수 있음
+m1$cptable
+m3 <- rpart(Species ~ . , data = iris, control = rpart.control(cp = 0.44))
+
+dev.new()
+plotcp(m1)
+
+dev.new()
+plot(iris[,-5], col = iris$Species)
+
+
+# 각 설명변수의 중요도
+m1$variable.importance
+
+# Petal.Width Petal.Length Sepal.Length  Sepal.Width 
+# 88.96940     81.34496     54.09606     36.01309 
+
+# [ 연습 문제 - cancer data에 대한 Decision Tree 모델링 및 튜닝 ]
+cancer <- read.csv('cancer.csv')
+
+cancer <- cancer[,-1]
+
+# sampling
+rn <- sample(1:nrow(cancer), nrow(cancer)*0.7)
+
+cancer_tr <- cancer[rn, ]
+cancer_te <- cancer[-rn, ]
+
+# modeling
+m1 <- rpart(diagnosis ~ ., data = cancer_tr)
+m1
+
+# 시각화
+library(rpart.plot)
+
+dev.new()
+prp(m1, type = 4, extra = 3)
+
+# 모델 확인
+m1$cptable
+
+dev.new()
+plotcp(m1)    # 과적합 여부, 적절한 depth 확인!!!
+
+v1 <- names(sort(m1$variable.importance, decreasing = T)[1:6])  # 변수중요도가 높은  상위 변수 선택
+                                                                # 상위 6개가 나머지보다 앞도적으로 변수중요도가 높게 나옴
+                                                                # (각자 다를 수 있음)
+
+# scatter matrix를 통한 변수별 중요도 시각화
+dev.new()
+cancer$diagnosis <- factor(cancer$diagnosis)  # diagnosis 컬럼을 색변수로 사용하기 위해 factor로 변경
+plot(cancer[,v1], col = cancer$diagnosis)     # 위에서 변수중요도가 높다고 판단된 컬럼만 선택해서 산점도 그려보기
+
+# 평가
+vpre_tr <- predict(m1, newdata = cancer_tr, type = 'class')
+vpre_te <- predict(m1, newdata = cancer_te, type = 'class')
+
+sum(vpre_tr == cancer_tr$diagnosis) / nrow(cancer_tr) * 100   # 96.48
+sum(vpre_te == cancer_te$diagnosis) / nrow(cancer_te) * 100   # 94.15
+
+
+# cp값의 변화에 따른 모델 예측력 변화
+vcp <- m1$cptable[,1]    # cp값 가져오기
+
+vscore_tr <- c() ; vscore_te <- c()
+for (i in vcp) {
+  m1 <- rpart(diagnosis ~ ., data = cancer_tr, control = rpart.control(cp = i))
+  vpre_tr <- predict(m1, newdata = cancer_tr, type = 'class')
+  vpre_te <- predict(m1, newdata = cancer_te, type = 'class')
+  
+  score_tr <- sum(vpre_tr == cancer_tr$diagnosis) / nrow(cancer_tr) * 100   
+  score_te <- sum(vpre_te == cancer_te$diagnosis) / nrow(cancer_te) * 100   
+  
+  vscore_tr <- c(vscore_tr, score_tr)
+  vscore_te <- c(vscore_te, score_te)
+}
+
+dev.new()
+plot(vscore_tr, type = 'o', col = 'red', ylim = c(85,100), axes = F)
+lines(vscore_te, type = 'o', col = 'blue')
+
+legend(4.5, 100, legend = c('train', 'test'), col = c('red', 'blue'), lty = 1)
+
+axis(1, at = 1:5, labels = round(vcp,2))
+axis(2)
+
+# 분류 분석 모델에서의 변수 선택 척도
+# 1. IG(Information Gain) : 상위노드불순도 - 총합(하위노드불순도*하위노드확률)
+# - 상위노드의 불순도와 하위노드의 불순도의 차이
+# - 클수록 분류 기준으로 좋은 변수 => 트리 구조의 상단에 배치 확률 높아짐
+
+# 2. 지니 계수(Gini index) : 불순도 측정 지표
+# - 한 노드가 여러 클래스로 섞여 있는지(불순한지)를 확인하는 지표
+# - 지니계수가 클수록 불순도가 높다(여러 클래스들끼리 섞여있음 => 아직 분리가 잘 이뤄지지 X)
+
+# 3. 엔트로피 : 열역학에서의 무질서 척도
+# - 클수록 불순(여러 클래스들이 혼합)
+# - -(P(n1) * log2P(n1) + P(n2) * log2P(n2) + ... + )
